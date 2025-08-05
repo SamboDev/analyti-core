@@ -1,6 +1,7 @@
-const API_URL = "http://localhost:8000"; // Cambia esto por la URL de Render en producción
+const API_URL = process.env.REACT_APP_API_URL;
+const SUBMISSION_URL = process.env.REACT_APP_SUBMISSION_URL;
 
-// Enviar texto para análisis (POST /jobs/)
+// Crear job de análisis
 export async function createJob(text) {
     const res = await fetch(`${API_URL}/jobs/`, {
         method: "POST",
@@ -11,9 +12,20 @@ export async function createJob(text) {
     return await res.json();
 }
 
-// Consultar resultado por ID (GET /jobs/{id})
+// Obtener resultado de job
 export async function getJob(id) {
     const res = await fetch(`${API_URL}/jobs/${id}`);
     if (!res.ok) throw new Error("Job no encontrado");
+    return await res.json();
+}
+
+// Ejemplo: enviar datos a otro servicio (submission)
+export async function submitAnalysis(data) {
+    const res = await fetch(`${SUBMISSION_URL}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error("Error al enviar los datos");
     return await res.json();
 }
