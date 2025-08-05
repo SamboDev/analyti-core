@@ -12,6 +12,7 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# Modelo para almacenar los análisis
 class Analysis(Base):
     __tablename__ = "analyses"
     id = Column(Integer, primary_key=True, index=True)
@@ -21,11 +22,17 @@ class Analysis(Base):
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI()
+app = FastAPI(
+    title="Analysis Service",
+    description="Microservicio para análisis de sentimiento y extracción de palabras clave.",
+    version="1.0.0"
+)
 
+# Esquema de entrada
 class AnalysisRequest(BaseModel):
     text: str
 
+# Esquema de salida
 class AnalysisResult(BaseModel):
     id: int
     text: str
@@ -34,22 +41,35 @@ class AnalysisResult(BaseModel):
 
 @app.post("/analyze/", response_model=AnalysisResult)
 def analyze(request: AnalysisRequest):
-    # --- Lógica "dummy" de análisis ---
     texto = request.text.lower()
-    sentimiento = "positivo" if "feliz" in texto or "bien" in texto else "neutral"
-    palabras_clave = ", ".join([w for w in texto.split() if len(w) > 4])
-
+    # Análisis de sentimiento simple
+    if any(word in texto for word in ["feliz", "bien", "excelente", "alegre"]):
+        sentimiento = "positivo"
+    elif any(word in texto for word in ["triste", "mal", "enojado", "horrible"]):
+        sentimiento = "negativo"
+    else:
+        sentimiento = "neutral"
+    # Extracción de palabras clave (palabras de más de 4 letras)
+    palabras = [w.strip(".,;:¿?¡!") for w in texto.split()]
+    palabras_clave = list({w for w in palabras if len(w) > 4})
+    palabras_clave_str = ", ".join(palabras_clave)
+    # Guardar en la base
     db = SessionLocal()
     analysis = Analysis(
         text=request.text,
         sentiment=sentimiento,
-        keywords=palabras_clave
+        keywords=palabras_clave_str
     )
     db.add(analysis)
     db.commit()
     db.refresh(analysis)
     db.close()
-    return analysis
+    return {
+        "id": analysis.id,
+        "text": analysis.text,
+        "sentiment": analysis.sentiment,
+        "keywords": analysis.keywords
+    }
 
 @app.get("/analyses/{analysis_id}", response_model=AnalysisResult)
 def get_analysis(analysis_id: int):
@@ -58,4 +78,13 @@ def get_analysis(analysis_id: int):
     db.close()
     if analysis is None:
         raise HTTPException(status_code=404, detail="Analysis not found")
-    return analysis
+    return {
+        "id": analysis.id,
+        "text": analysis.text,
+        "sentiment": analysis.sentiment,
+        "keywords": analysis.keywords
+    }
+
+@app.get("/")
+def health_check():
+    return {"status": "ok"}
